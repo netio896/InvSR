@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>AI超分辨率放大工具 Pro+ 版</title>
+  <script src="https://cdn.jsdelivr.net/npm/waifu2x-web@latest/dist/waifu2x.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    body { font-family: "Microsoft Yahei", Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center; padding: 40px; color: white; }
+    .container { max-width: 900px; margin: auto; background: rgba(255,255,255,0.95); padding: 30px; border-radius: 16px; color: #333; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    h2 { margin-bottom: 20px; color: #667eea; }
+    input, select, button { margin: 10px; padding: 12px 20px; font-size: 16px; border: 2px solid #667eea; border-radius: 8px; }
+    button { background: #667eea; color: white; cursor: pointer; transition: 0.3s; }
+    button:hover { background: #764ba2; }
+    .card { margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; text-align: left; }
+    img { max-width: 100%; border-radius: 8px; margin-top: 10px; }
+    .progress { width: 100%; background: #ddd; border-radius: 8px; overflow: hidden; margin: 10px 0; height: 18px; }
+    .progress-bar { height: 100%; background: #667eea; width: 0%; text-align: center; font-size: 12px; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎨 AI超分辨率无损放大工具 Pro+ 版</h2>
+    <p>支持多线程处理、自定义倍数、降噪、ZIP 批量下载</p>
+    
+    <input type="file" id="fileInput" accept="image/*" multiple/>
+    
+    <div class="settings">
+      <label>放大倍数：</label>
+      <select id="scaleSelect">
+        <option value="2">2x</option>
+        <option value="3">3x</option>
+        <option value="4">4x</option>
+        <option value="8">8x</option>
+      </select>
+      <label>降噪：</label>
+      <select id="noiseSelect">
+        <option value="0">无</option>
+        <option value="1">低</option>
+        <option value="2">中</option>
+        <option value="3">高</option>
+      </select>
+      <label>模型：</label>
+      <select id="styleSelect">
+        <option value="anime">动漫</option>
+        <option value="photo">照片</option>
+      </select>
+      <label>输出：</label>
+      <select id="formatSelect">
+        <option value="png">PNG</option>
+        <option value="jpg">JPG</option>
+      </select>
+    </div>
+    
+    <button onclick="upscaleImages()">🚀 开始AI放大</button>
+    <button onclick="downloadAll()" id="zipBtn" style="display:none;">📦 下载全部 ZIP</button>
+    
+    <div id="output"></div>
+  </div>
+  
+  <script>
+    let processedImages = [];
+
+    async function upscaleImages() {
+      const files = document.getElementById('fileInput').files;
+      if (!files.length) { alert("请选择至少一张图片"); return; }
+
+      const scale = parseInt(document.getElementById('scaleSelect').value);
+      const noise = parseInt(document.getElementById('noiseSelect').value);
+      const format = document.getElementById('formatSelect').value;
+
+      processedImages = [];
+      document.getElementById('output').innerHTML = '';
+      document.getElementById('zipBtn').style.display = 'none';
+
+      [...files].forEach((file, i) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const img = new Image();
+          img.onload = async () => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `<h4>图片 ${i+1}：${file.name}</h4>
+                              <div class="progress"><div class="progress-bar" id="bar${i}">0%</div></div>`;
+            document.getElementById('output').appendChild(card);
+
+            // 模拟进度条更新
+            const bar = document.getElementById(`bar${i}`);
+            let percent = 0;
+            const timer = setInterval(() => {
+              if (percent < 90) { percent += 10; bar.style.width = percent+"%"; bar.innerText = percent+"%"; }
+            }, 500);
+
+            const result = await waifu2x(img, { scale: scale, noise: noise });
+            clearInterval(timer);
+            bar.style.width = "100%";
+            bar.innerText = "完成";
+
+            const dataUrl = format === 'png' ? result.toDataURL('image/png') : result.toDataURL('image/jpeg', 0.95);
+            processedImages.push({name: "upscaled_"+file.name, data: dataUrl});
+
+            card.innerHTML += `<img src="${dataUrl}">
+                               <br/><a href="${dataUrl}" download="upscaled_${i+1}.${format}" class="btn">📥 下载</a>`;
+            
+            if (processedImages.length === files.length) {
+              document.getElementById('zipBtn').style.display = 'inline-block';
+            }
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function downloadAll() {
+      const zip = new JSZip();
+      processedImages.forEach(img => {
+        zip.file(img.name, img.data.split('base64,')[1], {base64: true});
+      });
+      zip.generateAsync({type:"blob"}).then(content => {
+        saveAs(content, "AI_UpScaled_Images.zip");
+      });
+    }
+  </script>
+</body>
+</html>
